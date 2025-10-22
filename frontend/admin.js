@@ -1,4 +1,4 @@
-const API_URL = 'https://newsmmpanel.onrender.com/api'; // 🚨 URL DEVE ESTAR AQUI!
+const API_URL = '/api'; // 🚨 URL DEVE ESTAR AQUI!
 const PEDIDOS_CONTAINER = document.getElementById('pedidos-container');
 
 // Elementos de Configuração SMM
