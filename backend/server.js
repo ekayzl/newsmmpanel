@@ -3,21 +3,22 @@ const fs = require('fs/promises');
 const path = require('path');
 const cors = require('cors');
 const axios = require('axios'); 
-const { initMPClient, criarPagamentoPixMP } = require('./mercadopago'); // NOVO: Módulo Mercado Pago
+const { initMPClient, criarPagamentoPixMP } = require('./mercadopago');
 
 const app = express();
-const PORT = 3000;
+// No Render/Railway, a porta é fornecida pelo ambiente (process.env.PORT)
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
-// 💥 JÁ EXISTENTE: Para tratar payloads application/x-www-form-urlencoded
 app.use(express.urlencoded({ extended: true })); 
 app.use(cors());
 
 // -------------------------------------------------------------------------
 // Configuração para Servir a Pasta Frontend (MUITO IMPORTANTE)
 // -------------------------------------------------------------------------
-const frontendPath = path.join(__dirname, '..', 'frontend');
+// Este caminho assume que server.js está em /backend e frontend em /frontend
+const frontendPath = path.join(__dirname, '..', 'frontend'); 
 console.log(`Servindo arquivos estáticos de: ${frontendPath}`);
 app.use(express.static(frontendPath));
 
@@ -31,11 +32,11 @@ const CONFIGURACOES_PATH = path.join(__dirname, '..', 'data', 'configuracoes.jso
 // -------------------------------------------------------------------------
 async function loadConfig() {
     try {
-        const configsData = await fs.readFile(CONFIGURACOES_PATH, 'utf-8');
+        const configsData = await fs.readFile(CONFIGURACOES_PATH, 'utf-8'); //
         let configs = JSON.parse(configsData);
         
         // NOVO: Inicializa o cliente Mercado Pago ao carregar a config (se houver token)
-        if (configs.mercadopago && configs.mercadopago.access_token) {
+        if (configs.mercadopago && configs.mercadopago.access_token) { //
             initMPClient(configs.mercadopago.access_token);
         }
         
@@ -51,15 +52,18 @@ async function loadConfig() {
 // -------------------------------------------------------------------------
 async function enviarParaFornecedor(pedido) {
     const config = await loadConfig();
-    const FORNECEDOR_CONFIG = config.fornecedor_smm;
+    const FORNECEDOR_CONFIG = config.fornecedor_smm; //
     const MODO_PRODUCAO = config.modo === 'real';
 
     if (MODO_PRODUCAO) {
         // --- MODO DE PRODUÇÃO (CHAMADA REAL) ---
         console.log(`[PROD-SMM] Tentando enviar pedido ID ${pedido.id} REALMENTE para o fornecedor...`);
         try {
-            const serviceId = FORNECEDOR_CONFIG.servico_padrao; 
-            const quantity = FORNECEDOR_CONFIG.quantidade_padrao;
+            // No seu código, o ID e quantidade SMM estão fixos na config.
+            // O correto seria usar pedido.pacote.servico_api_id e a quantidade do pedido.
+            // Para manter a lógica ATUAL, vamos usar o fixo, mas ajustamos o SMM no Front-end:
+            const serviceId = pedido.pacote.servico_api_id || FORNECEDOR_CONFIG.servico_padrao; 
+            const quantity = pedido.quantidade || FORNECEDOR_CONFIG.quantidade_padrao;
 
             const smmPayload = {
                 key: FORNECEDOR_CONFIG.api_key,
@@ -97,11 +101,103 @@ async function enviarParaFornecedor(pedido) {
 
 
 // -------------------------------------------------------------------------
+// NOVAS FUNÇÕES UTILITÁRIAS PARA O ADMIN
+// -------------------------------------------------------------------------
+
+/**
+ * @description Checa o saldo real do fornecedor SMM.
+ */
+async function checkSmmBalance(smmConfig) {
+    try {
+        const payload = {
+            key: smmConfig.api_key,
+            action: 'balance'
+        };
+
+        const response = await axios.post(smmConfig.api_url, payload);
+        const data = response.data;
+
+        if (data.error) {
+            throw new Error(`Erro API SMM: ${data.error}`);
+        }
+        
+        // Retorna o saldo (o nome da chave é 'balance' na maioria das APIs SMM)
+        return parseFloat(data.balance); 
+
+    } catch (error) {
+        console.error('[SMM-BALANCE] Erro ao buscar saldo:', error.message);
+        throw new Error('Falha ao comunicar com a API SMM para checar saldo.');
+    }
+}
+
+/**
+ * @description Puxa a lista de serviços do fornecedor SMM.
+ */
+async function fetchSmmServices(smmConfig) {
+    try {
+        const payload = {
+            key: smmConfig.api_key,
+            action: 'services'
+        };
+
+        const response = await axios.post(smmConfig.api_url, payload);
+        const data = response.data;
+
+        if (data.error) {
+            throw new Error(`Erro API SMM: ${data.error}`);
+        }
+        
+        // O retorno esperado é um array de objetos [ {service: '...', name: '...', rate: '...'}, ... ]
+        return data; 
+
+    } catch (error) {
+        console.error('[SMM-SERVICES] Erro ao buscar serviços:', error.message);
+        throw new Error('Falha ao comunicar com a API SMM para buscar serviços.');
+    }
+}
+
+/**
+ * @description Checa o status de um pedido na API SMM.
+ */
+async function checkSmmStatus(smmConfig, orderId) {
+    try {
+        const payload = {
+            key: smmConfig.api_key,
+            action: 'status',
+            order: orderId
+        };
+
+        const response = await axios.post(smmConfig.api_url, payload);
+        const data = response.data;
+
+        if (data.error) {
+            throw new Error(`Erro API SMM: ${data.error}`);
+        }
+        
+        // Retorna o status (geralmente data.status ou data.order)
+        // Tentativa de padronizar o retorno
+        const statusKey = Object.keys(data).find(key => key.toLowerCase().includes('status'));
+        
+        if (statusKey) {
+            return data[statusKey];
+        }
+        
+        // Se a API retornar só o status no root ou outro formato comum
+        return data.status || data.order; 
+
+    } catch (error) {
+        console.error('[SMM-STATUS] Erro ao checar status:', error.message);
+        throw new Error('Falha ao comunicar com a API SMM para checar status.');
+    }
+}
+
+
+// -------------------------------------------------------------------------
 // Rota para obter os pacotes
 // -------------------------------------------------------------------------
 app.get('/api/pacotes', async (req, res) => {
     try {
-        const data = await fs.readFile(PACOTES_PATH, 'utf-8');
+        const data = await fs.readFile(PACOTES_PATH, 'utf-8'); //
         const pacotes = JSON.parse(data);
         res.json(pacotes);
     } catch (error) {
@@ -114,6 +210,7 @@ app.get('/api/pacotes', async (req, res) => {
 // -------------------------------------------------------------------------
 // Rota para receber pedido (Primeira etapa do checkout)
 // -------------------------------------------------------------------------
+// ... (Lógica POST /api/pedido inalterada) ...
 app.post('/api/pedido', async (req, res) => {
     const novoPedido = req.body; 
 
@@ -128,9 +225,26 @@ app.post('/api/pedido', async (req, res) => {
             pedidos = JSON.parse(pedidosData);
         }
         
+        // Lógica para encontrar o pacote [NOVO: Necessário para o valor e ID SMM]
+        const pacotesData = await fs.readFile(PACOTES_PATH, 'utf-8'); //
+        const pacotesJson = JSON.parse(pacotesData);
+        let pacoteEncontrado = null;
+        
+        pacotesJson.categorias.forEach(categoria => {
+            const encontrado = categoria.pacotes.find(p => p.id === parseInt(novoPedido.pacoteId));
+            if (encontrado) pacoteEncontrado = encontrado;
+        });
+
+        if (!pacoteEncontrado) {
+             return res.status(404).json({ erro: 'Pacote não encontrado.' });
+        }
+
+
         const pedidoCompleto = {
             id: Date.now(), 
             ...novoPedido,
+            pacote: pacoteEncontrado, // Salva os dados completos do pacote
+            valor: pacoteEncontrado.preco, // O valor real do pacote vendido
             data: new Date().toISOString(),
             status: 'Pendente Pagamento',
             api_status: null, 
@@ -138,9 +252,9 @@ app.post('/api/pedido', async (req, res) => {
             pagamento: {
                 status: 'Aguardando',
                 metodo: null,
-                gateway: null, // NOVO: Para saber qual gateway foi usado
-                qr_code_base64: null, // NOVO: Padronizado
-                pix_code: null,      // NOVO: Padronizado
+                gateway: null, 
+                qr_code_base64: null, 
+                pix_code: null,      
                 external_id: null
             }
         };
@@ -164,6 +278,7 @@ app.post('/api/pedido', async (req, res) => {
 // -------------------------------------------------------------------------
 // ROTA MODIFICADA: Iniciar Pagamento (Centralizada MP e PP)
 // -------------------------------------------------------------------------
+// ... (Lógica POST /api/pagamento inalterada, exceto que o valor agora vem do pedido) ...
 app.post('/api/pagamento', async (req, res) => {
     const { pedidoId, metodoPagamento } = req.body;
 
@@ -185,7 +300,8 @@ app.post('/api/pagamento', async (req, res) => {
         }
 
         const pedido = pedidos[pedidoIndex];
-        const valor = configs.pagamento.valor_padrao_pacote || 1.00; // Valor do pacote
+        // ⚠️ USANDO O VALOR REAL DO PACOTE NO PEDIDO, NÃO O VALOR PADRÃO DA CONFIG
+        const valor = pedido.pacote.preco; 
         
         let qrCodePix;
         let codigoPixCopiaCola;
@@ -193,13 +309,13 @@ app.post('/api/pagamento', async (req, res) => {
         let gatewayUsado = gatewayAtivo; 
 
         if (gatewayAtivo === 'PushinPay') {
+            // ... (Lógica PushinPay inalterada) ...
             
-            const ppConfig = configs.pushinpay;
+            const ppConfig = configs.pushinpay; //
             if (!ppConfig || !ppConfig.api_key || !ppConfig.api_url) {
                  throw new Error('PushinPay não configurado no painel admin.');
             }
             
-            // Usa a config antiga para a URL do webhook (simulação/real)
             const ppConfigOld = MODO_PRODUCAO 
                 ? configs.pagamento.pushinpay.modo_real 
                 : configs.pagamento.pushinpay.modo_simulacao;
@@ -217,7 +333,7 @@ app.post('/api/pagamento', async (req, res) => {
                     
                     const response = await axios.post(ppConfig.api_url, paymentPayload, {
                         headers: { 
-                            'Authorization': `Bearer ${ppConfig.api_key}`, 
+                            'Authorization': `Bearer ${ppConfig.api_key}`, //
                             'Content-Type': 'application/json' 
                         }
                     });
@@ -271,9 +387,8 @@ app.post('/api/pagamento', async (req, res) => {
         pedido.pagamento = {
             status: 'Aguardando Pagamento',
             metodo: metodoPagamento,
-            gateway: gatewayUsado, // NOVO: Salva qual gateway foi usado
+            gateway: gatewayUsado, 
             valor: valor,
-            // Padroniza as chaves de Pix
             qr_code_base64: qrCodePix,
             pix_code: codigoPixCopiaCola,
             external_id: externalIdGateway, 
@@ -291,7 +406,7 @@ app.post('/api/pagamento', async (req, res) => {
         res.status(200).json({
             mensagem: 'Pagamento iniciado com sucesso.',
             pedidoId: pedido.id,
-            gateway: gatewayUsado, // NOVO
+            gateway: gatewayUsado, 
             qrCodeBase64: qrCodePix,
             pixCode: codigoPixCopiaCola,
             valor: valor,
@@ -303,7 +418,7 @@ app.post('/api/pagamento', async (req, res) => {
         res.status(500).json({ erro: error.message || 'Erro interno ao processar o pagamento.' });
     }
 });
-
+// ... (Rotas de Webhook Inalteradas) ...
 
 // -------------------------------------------------------------------------
 // Endpoint de Webhook (Recebe confirmação da PushinPay e ENVIA AO SMM)
@@ -312,13 +427,12 @@ app.post('/api/webhook', async (req, res) => {
     
     const webhookData = req.body || {};
     
+    // ... (Lógica de Webhook PushinPay inalterada) ...
     console.log('[WEBHOOK-PP] REQUEST RECEBIDO.');
     console.log('[WEBHOOK-PP] Dados Recebidos (req.body):', webhookData);
     
-    // Tenta obter o ID do gateway (PushinPay usa external_id)
     const rawGatewayId = webhookData.external_id || webhookData.id; 
     
-    // Converte o ID recebido para minúsculas
     const gatewayIdParaBusca = rawGatewayId ? rawGatewayId.toLowerCase() : null;
     
     const statusPagamento = webhookData.status || webhookData.status_pagamento; 
@@ -328,7 +442,6 @@ app.post('/api/webhook', async (req, res) => {
           return res.status(200).send('Webhook recebido, mas sem ID de gateway válido.');
     }
     
-    // Confirma status de sucesso em produção
     const statusAprovado = ['APPROVED', 'CONFIRMED', 'PAID'];
     if (!statusPagamento || !statusAprovado.includes(statusPagamento.toUpperCase())) {
         console.log(`[WEBHOOK-PP] Status de pagamento para ID ${gatewayIdParaBusca} não aprovado: ${statusPagamento}. Ignorado.`);
@@ -339,7 +452,6 @@ app.post('/api/webhook', async (req, res) => {
         const pedidosData = await fs.readFile(PEDIDOS_PATH, 'utf-8');
         let pedidos = JSON.parse(pedidosData);
         
-        // Busca o pedido garantindo que o ID salvo também seja minúsculo antes da comparação.
         const pedidoIndex = pedidos.findIndex(p => 
             p.pagamento && p.pagamento.external_id && p.pagamento.external_id.toLowerCase() === gatewayIdParaBusca
         ); 
@@ -390,12 +502,11 @@ app.post('/api/webhook-mp', async (req, res) => {
     
     const notification = req.body || {};
     
-    // Log de Debug
+    // ... (Lógica de Webhook Mercado Pago inalterada) ...
     console.log('[WEBHOOK-MP] ---------------------------------------------');
     console.log('[WEBHOOK-MP] Notificação Recebida:', notification);
     console.log('[WEBHOOK-MP] ---------------------------------------------');
     
-    // 1. Verifica se a notificação é de pagamento e possui ID (Pode ser 'data.id' dependendo do formato)
     const paymentId = notification.data?.id || notification.id;
     if (notification.topic !== 'payment' || !paymentId) {
         return res.status(200).send('Notificação ignorada.');
@@ -403,7 +514,7 @@ app.post('/api/webhook-mp', async (req, res) => {
     
     try {
         const configs = await loadConfig();
-        const accessToken = configs.mercadopago?.access_token;
+        const accessToken = configs.mercadopago?.access_token; //
 
         if (!accessToken) {
             console.error('[WEBHOOK-MP] Access Token do Mercado Pago não configurado.');
@@ -418,12 +529,11 @@ app.post('/api/webhook-mp', async (req, res) => {
         });
         
         const paymentData = paymentResponse.data;
-        const externalReference = paymentData.external_reference; // ID do pedido local
-        const paymentStatus = paymentData.status; // 'approved', 'pending', 'rejected', etc.
+        const externalReference = paymentData.external_reference; 
+        const paymentStatus = paymentData.status; 
 
         console.log(`[WEBHOOK-MP] Status do Pagamento ${paymentId}: ${paymentStatus}. Referência Externa: ${externalReference}`);
         
-        // 3. Verifica se o pagamento foi aprovado
         if (paymentStatus !== 'approved') {
             return res.status(200).send(`Pagamento ${paymentId} não aprovado (${paymentStatus}). Ignorado.`);
         }
@@ -479,11 +589,237 @@ app.post('/api/webhook-mp', async (req, res) => {
 });
 
 
+// -------------------------------------------------------------------------
+// ROTA NOVO: Dashboard Data (Faturamento, Lucro, etc.)
+// -------------------------------------------------------------------------
+app.get('/api/admin/dashboard-data', async (req, res) => {
+    try {
+        const pedidosData = await fs.readFile(PEDIDOS_PATH, 'utf-8');
+        const pedidos = JSON.parse(pedidosData);
+        
+        let totalPedidos = 0;
+        let totalFaturamento = 0;
+        let totalLucro = 0;
+        
+        pedidos.forEach(pedido => {
+            // Conta apenas pedidos com pagamento confirmado (ou enviado)
+            if (pedido.pagamento && pedido.pagamento.status === 'Confirmado' || pedido.status.includes('Enviado')) {
+                totalPedidos++;
+                const valorVenda = pedido.valor || pedido.pacote.preco || 0; // Preço vendido
+                totalFaturamento += valorVenda;
+                
+                // Cálculo de Lucro Estimado (AQUI ESTÁ A CHAVE)
+                // O custo SMM não está salvo em pedidos.json, mas podemos ESTIMAR:
+                // Custo SMM = (Valor de Venda) * (1 - Porcentagem Lucro) 
+                // Exemplo: Se o lucro foi de 50%, o custo foi 50%
+                
+                // **Melhoria: Adicionando campo de custo_api_rate nos pacotes para cálculo preciso**
+                // Por enquanto, vamos manter uma estimativa simples: 50% de lucro.
+                
+                const lucroEstimado = valorVenda * 0.5; // 50% de margem
+                totalLucro += lucroEstimado;
+            }
+        });
+
+        res.json({
+            totalPedidos: totalPedidos,
+            faturamento: totalFaturamento,
+            lucro: totalLucro,
+            pedidosStatus: {} // Placeholder para dados de gráfico
+        });
+        
+    } catch (error) {
+        console.error('[ADMIN] Erro ao buscar dados do Dashboard:', error);
+        res.status(500).json({ error: 'Erro ao calcular métricas.' });
+    }
+});
+
+
+// -------------------------------------------------------------------------
+// ROTA NOVO: Checar Saldo SMM
+// -------------------------------------------------------------------------
+app.get('/api/admin/smm/check-balance', async (req, res) => {
+    try {
+        const configs = await loadConfig();
+        const smmConfig = configs.fornecedor_smm;
+        
+        if (configs.modo === 'simulacao') { //
+             return res.json({ success: true, balance: 999.99, message: 'Simulação de Saldo.' });
+        }
+
+        if (!smmConfig || !smmConfig.api_key || !smmConfig.api_url) { //
+            return res.status(400).json({ success: false, message: 'Configuração SMM incompleta.' });
+        }
+
+        const balance = await checkSmmBalance(smmConfig);
+        
+        res.json({ success: true, balance: balance, message: 'Saldo obtido com sucesso.' });
+        
+    } catch (error) {
+        console.error('[ADMIN] Erro ao checar saldo SMM:', error);
+        res.status(500).json({ success: false, message: error.message || 'Erro interno ao checar saldo.' });
+    }
+});
+
+
+// -------------------------------------------------------------------------
+// ROTA NOVO: Puxar Serviços do Fornecedor SMM
+// -------------------------------------------------------------------------
+app.get('/api/admin/smm/fetch-services', async (req, res) => {
+    try {
+        const configs = await loadConfig();
+        const smmConfig = configs.fornecedor_smm;
+        
+        if (!smmConfig || !smmConfig.api_key || !smmConfig.api_url) { //
+            return res.status(400).json({ success: false, message: 'Configuração SMM incompleta. Salve as chaves primeiro.' });
+        }
+
+        // 1. Puxa a lista real de serviços do SMM
+        const smmServices = await fetchSmmServices(smmConfig);
+        
+        // 2. Puxa os pacotes locais para comparação
+        const pacotesData = await fs.readFile(PACOTES_PATH, 'utf-8'); //
+        const pacotesJson = JSON.parse(pacotesData);
+        
+        // Converte a lista aninhada em uma lista simples de pacotes ativos
+        let pacotesAtuais = [];
+        pacotesJson.categorias.forEach(cat => {
+            pacotesAtuais.push(...cat.pacotes);
+        });
+        
+        res.json({ 
+            success: true, 
+            services: smmServices,
+            pacotesAtuais: pacotesAtuais,
+            message: 'Serviços do fornecedor e pacotes locais carregados.'
+        });
+        
+    } catch (error) {
+        console.error('[ADMIN] Erro ao buscar serviços SMM:', error);
+        res.status(500).json({ success: false, message: error.message || 'Erro interno ao buscar serviços.' });
+    }
+});
+
+
+// -------------------------------------------------------------------------
+// ROTA NOVO: Salvar Pacotes Configurados (Atualiza pacotes.json)
+// -------------------------------------------------------------------------
+app.post('/api/admin/smm/save-packages', async (req, res) => {
+    const { pacotes } = req.body; // Array de pacotes configurados do Admin.js
+    
+    if (!pacotes || pacotes.length === 0) {
+        return res.status(400).json({ success: false, message: 'Nenhum pacote para salvar foi recebido.' });
+    }
+
+    try {
+        // 1. Carrega o template atual (principalmente as categorias)
+        const pacotesData = await fs.readFile(PACOTES_PATH, 'utf-8'); //
+        let pacotesJson = JSON.parse(pacotesData);
+        let categoriasAtuais = pacotesJson.categorias;
+        
+        // 2. Cria um mapa de categorias para agrupar os novos pacotes
+        const novasCategorias = {};
+        
+        // Mapeamento de IDs SMM para Categorias (simplificado - Categoria é salva no hidden field)
+        pacotes.forEach(pacote => {
+            const categoriaId = pacote.categoriaId || 'outros'; 
+            
+            if (!novasCategorias[categoriaId]) {
+                 // Tenta encontrar o nome da categoria existente, senão usa um nome padrão
+                const catExistente = categoriasAtuais.find(c => c.id === categoriaId);
+                novasCategorias[categoriaId] = {
+                    id: categoriaId,
+                    nome: catExistente ? catExistente.nome : categoriaId.replace('_', ' ').toUpperCase(),
+                    descricao: catExistente ? catExistente.descricao : 'Serviços configurados via painel admin.',
+                    pacotes: []
+                };
+            }
+
+            // Adiciona o pacote formatado
+            novasCategorias[categoriaId].pacotes.push({
+                id: parseInt(pacote.apiId), // Usando o ID da API como ID local (simplifica a busca)
+                nome: pacote.nome,
+                preco: parseFloat(pacote.preco),
+                min: parseInt(pacote.apiMin),
+                max: parseInt(pacote.apiMax),
+                servico_api_id: pacote.apiId // ID do serviço no fornecedor
+            });
+        });
+
+        // 3. Atualiza o JSON
+        pacotesJson.categorias = Object.values(novasCategorias);
+        
+        await fs.writeFile(PACOTES_PATH, JSON.stringify(pacotesJson, null, 2)); //
+
+        res.status(200).json({ 
+            success: true, 
+            count: pacotes.length,
+            message: 'Pacotes da loja atualizados com sucesso.' 
+        });
+
+    } catch (error) {
+        console.error('[ADMIN] Erro ao salvar pacotes SMM:', error);
+        res.status(500).json({ success: false, message: 'Erro interno ao salvar pacotes.' });
+    }
+});
+
+
+// -------------------------------------------------------------------------
+// ROTA MODIFICADA: Checar Status do Pedido no Fornecedor (Real ou Simulado)
+// -------------------------------------------------------------------------
+app.post('/api/admin/checar-status', async (req, res) => {
+    const { pedidoId } = req.body;
+
+    try {
+        const pedidosData = await fs.readFile(PEDIDOS_PATH, 'utf-8');
+        let pedidos = JSON.parse(pedidosData);
+        const pedidoIndex = pedidos.findIndex(p => p.id === parseInt(pedidoId));
+        const configs = await loadConfig();
+
+        if (pedidoIndex === -1 || !pedidos[pedidoIndex].api_id) {
+            return res.status(404).json({ 
+                status_smm: 'NOT_SENT', 
+                mensagem: 'Pedido não encontrado ou não enviado ao SMM.' 
+            });
+        }
+        
+        const pedido = pedidos[pedidoIndex];
+        const MODO_PRODUCAO = configs.modo === 'real';
+
+        let currentStatus;
+        
+        if (MODO_PRODUCAO) {
+            // --- MODO DE PRODUÇÃO (CHAMADA REAL) ---
+            const smmConfig = configs.fornecedor_smm; //
+            currentStatus = await checkSmmStatus(smmConfig, pedido.api_id);
+            
+        } else {
+            // --- MODO DE SIMULAÇÃO (Mantendo a lógica anterior) ---
+            const statusList = ['Processing', 'In Progress', 'Completed', 'Partial', 'Cancelled'];
+            currentStatus = statusList[Math.floor(Math.random() * statusList.length)]; 
+        }
+
+        // Atualiza e salva o status
+        pedido.api_status = currentStatus;
+        pedidos[pedidoIndex] = pedido;
+        await fs.writeFile(PEDIDOS_PATH, JSON.stringify(pedidos, null, 2));
+
+        res.json({
+            status_smm: currentStatus,
+            mensagem: `Status atualizado para: ${currentStatus}`
+        });
+
+    } catch (error) {
+        console.error('Erro ao checar status do pedido:', error);
+        res.status(500).json({ status_smm: 'ERROR', mensagem: 'Erro interno na checagem.' });
+    }
+});
 
 // -------------------------------------------------------------------------
 // ROTA FASE 4: Listar todos os pedidos (Para o Painel Admin)
 // -------------------------------------------------------------------------
 app.get('/api/admin/pedidos', async (req, res) => {
+// ... (Rota inalterada) ...
     try {
         const pedidosData = await fs.readFile(PEDIDOS_PATH, 'utf-8');
         let pedidos = JSON.parse(pedidosData);
@@ -494,11 +830,15 @@ app.get('/api/admin/pedidos', async (req, res) => {
         res.json([]);
     }
 });
-app.get('/api/admin/config/smm', async (req, res) => {
+
+// -------------------------------------------------------------------------
+// ROTA ADMIN: GET - Config SMM (para preencher o formulário)
+// -------------------------------------------------------------------------
+app.get('/api/admin/smm-config', async (req, res) => {
     try {
         const configs = await loadConfig();
 
-        const { api_url, api_key } = configs.fornecedor_smm || {};
+        const { api_url, api_key } = configs.fornecedor_smm || {}; //
 
         return res.json({
             apiUrl: api_url || '',
@@ -513,73 +853,37 @@ app.get('/api/admin/config/smm', async (req, res) => {
 
 
 // -------------------------------------------------------------------------
-// ROTA FASE 4: Checar Status do Pedido no Fornecedor (Simulado)
+// ROTA ADMIN: GET - Config Pagamento (para preencher o formulário)
 // -------------------------------------------------------------------------
-app.post('/api/admin/checar-status', async (req, res) => {
-    const { pedidoId } = req.body;
-
+app.get('/api/admin/pagamento-config', async (req, res) => {
     try {
-        const pedidosData = await fs.readFile(PEDIDOS_PATH, 'utf-8');
-        let pedidos = JSON.parse(pedidosData);
-        const pedidoIndex = pedidos.findIndex(p => p.id === parseInt(pedidoId));
-
-        if (pedidoIndex === -1 || !pedidos[pedidoIndex].api_id) {
-            return res.status(404).json({ 
-                status_smm: 'NOT_FOUND', 
-                mensagem: 'Pedido não encontrado ou não enviado ao SMM.' 
-            });
-        }
+        const configs = await loadConfig(); //
         
-        const statusList = ['Processing', 'In Progress', 'Completed', 'Partial', 'Cancelled'];
-        const currentStatus = statusList[Math.floor(Math.random() * statusList.length)]; 
-        
-        pedidos[pedidoIndex].api_status = currentStatus;
-        await fs.writeFile(PEDIDOS_PATH, JSON.stringify(pedidos, null, 2));
-
-        res.json({
-            status_smm: currentStatus,
-            mensagem: `Status simulado atualizado para: ${currentStatus}`
-        });
-
-    } catch (error) {
-        console.error('Erro ao checar status do pedido:', error);
-        res.status(500).json({ status_smm: 'ERROR', mensagem: 'Erro interno na checagem.' });
-    }
-});
-
-// ARQUIVO: /backend/server.js
-
-// -------------------------------------------------------------------------
-// FASE 4: Endpoint de Consulta Simples de Status
-// -------------------------------------------------------------------------
-app.get('/api/check-status/:pedidoId', async (req, res) => {
-    const { pedidoId } = req.params;
-
-    try {
-        const pedidosData = await fs.readFile(PEDIDOS_PATH, 'utf-8');
-        const pedidos = JSON.parse(pedidosData);
-
-        const pedido = pedidos.find(p => p.id === parseInt(pedidoId));
-
-        if (!pedido) {
-            return res.status(404).json({ status: 'Não encontrado' });
-        }
+        const pushinpay = configs.pushinpay || {};
+        const mercadopago = configs.mercadopago || {};
 
         return res.json({
-            status_pagamento: pedido.pagamento.status,
-            status_envio: pedido.status
+            gatewayAtivo: configs.gateway_ativo || 'PushinPay', 
+            pushinpay: {
+                apiUrl: pushinpay.api_url || '',
+                apiKeyExists: !!pushinpay.api_key
+            },
+            mercadopago: {
+                accessTokenExists: !!mercadopago.access_token
+            }
         });
 
     } catch (error) {
-        console.error(`Erro ao checar status do pedido ${pedidoId}:`, error);
-        return res.status(500).json({ status: 'Erro' });
+        console.error('[ADMIN] Erro ao buscar configurações de pagamento:', error);
+        res.status(500).json({ error: 'Erro ao buscar configurações.' });
     }
 });
+
 
 // -------------------------------------------------------------------------
 // ROTA ADMIN: POST - Salvar Configuração do Fornecedor SMM
 // -------------------------------------------------------------------------
-app.post('/api/admin/config/smm', async (req, res) => {
+app.post('/api/admin/config-smm', async (req, res) => {
     const { apiUrl, apiKey } = req.body;
 
     if (!apiUrl) {
@@ -587,7 +891,7 @@ app.post('/api/admin/config/smm', async (req, res) => {
     }
 
     try {
-        const configsData = await fs.readFile(CONFIGURACOES_PATH, 'utf-8');
+        const configsData = await fs.readFile(CONFIGURACOES_PATH, 'utf-8'); //
         let configs = JSON.parse(configsData);
 
         const currentApiKey = configs.fornecedor_smm?.api_key;
@@ -616,45 +920,19 @@ app.post('/api/admin/config/smm', async (req, res) => {
     }
 });
 
-// -------------------------------------------------------------------------
-// ROTA ADMIN: GET - Buscar Configuração de Pagamento (Gateway Ativo e Chaves)
-// -------------------------------------------------------------------------
-app.get('/api/admin/config/pagamento', async (req, res) => {
-    try {
-        const configs = await loadConfig();
-        
-        const pushinpay = configs.pushinpay || {};
-        const mercadopago = configs.mercadopago || {};
-
-        return res.json({
-            gatewayAtivo: configs.gateway_ativo || 'PushinPay', 
-            pushinpay: {
-                apiUrl: pushinpay.api_url || '',
-                apiKeyExists: !!pushinpay.api_key
-            },
-            mercadopago: {
-                accessTokenExists: !!mercadopago.access_token
-            }
-        });
-
-    } catch (error) {
-        console.error('[ADMIN] Erro ao buscar configurações de pagamento:', error);
-        res.status(500).json({ error: 'Erro ao buscar configurações.' });
-    }
-});
 
 // -------------------------------------------------------------------------
 // ROTA ADMIN: POST - Salvar Configuração de Pagamento
 // -------------------------------------------------------------------------
-app.post('/api/admin/config/pagamento', async (req, res) => {
-    const { gatewayAtivo, ppUrl, ppKey, mpToken } = req.body;
+app.post('/api/admin/config-pagamento', async (req, res) => {
+    const { gatewayAtivo, ppKey, mpToken } = req.body;
 
     if (!['PushinPay', 'MercadoPago'].includes(gatewayAtivo)) {
           return res.status(400).json({ error: 'Gateway de pagamento inválido.' });
     }
 
     try {
-        const configsData = await fs.readFile(CONFIGURACOES_PATH, 'utf-8');
+        const configsData = await fs.readFile(CONFIGURACOES_PATH, 'utf-8'); //
         let configs = JSON.parse(configsData);
         
         // --- Processa PushinPay ---
@@ -662,7 +940,7 @@ app.post('/api/admin/config/pagamento', async (req, res) => {
         const finalPpKey = ppKey || currentPpKey;
         
         configs.pushinpay = {
-            api_url: ppUrl || configs.pushinpay?.api_url || '',
+            api_url: configs.pushinpay?.api_url || 'https://api.pushinpay.com.br/api/pix/cashIn', // Mantendo a URL fixa
             api_key: finalPpKey || ''
         };
 
@@ -674,13 +952,10 @@ app.post('/api/admin/config/pagamento', async (req, res) => {
             access_token: finalMpToken || '',
         };
         
-        // Salva o gateway ativo
-        configs.gateway_ativo = gatewayAtivo;
-
+        configs.gateway_ativo = gatewayAtivo; //
 
         await fs.writeFile(CONFIGURACOES_PATH, JSON.stringify(configs, null, 2));
         
-        // NOVO: Inicializa o cliente MP IMEDIATAMENTE após salvar a nova chave
         if (finalMpToken) {
             initMPClient(finalMpToken);
         }
@@ -691,6 +966,34 @@ app.post('/api/admin/config/pagamento', async (req, res) => {
     } catch (error) {
         console.error('[ADMIN] Erro ao salvar configurações de pagamento:', error);
         res.status(500).json({ error: 'Erro interno ao salvar configuração.' });
+    }
+});
+
+// -------------------------------------------------------------------------
+// Endpoint de Consulta Simples de Status
+// -------------------------------------------------------------------------
+app.get('/api/check-status/:pedidoId', async (req, res) => {
+// ... (Rota inalterada) ...
+    const { pedidoId } = req.params;
+
+    try {
+        const pedidosData = await fs.readFile(PEDIDOS_PATH, 'utf-8');
+        const pedidos = JSON.parse(pedidosData);
+
+        const pedido = pedidos.find(p => p.id === parseInt(pedidoId));
+
+        if (!pedido) {
+            return res.status(404).json({ status: 'Não encontrado' });
+        }
+
+        return res.json({
+            status_pagamento: pedido.pagamento.status,
+            status_envio: pedido.status
+        });
+
+    } catch (error) {
+        console.error(`Erro ao checar status do pedido ${pedidoId}:`, error);
+        return res.status(500).json({ status: 'Erro' });
     }
 });
 
