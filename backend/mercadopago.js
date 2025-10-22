@@ -48,7 +48,7 @@ async function criarPagamentoPixMP(valor, description, email, externalReference)
             // Se precisar de CPF, adicione: identification: { type: 'CPF', number: '...' }
         },
         // Mude esta URL para o seu domínio real do ngrok ou produção
-        notification_url: 'https://talitha-paramagnetic-semiwildly.ngrok-free.dev/api/webhook-mp', 
+        notification_url: 'https://newsmmpanel.onrender.com/api/webhook-mp', 
         installments: 1
     };
 

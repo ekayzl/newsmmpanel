@@ -1,6 +1,6 @@
 // /loja/frontend/script.js - FASE 1 e FASE 2
 
-const API_URL = 'http://localhost:3000/api'; 
+const API_URL = 'https://newsmmpanel.onrender.com/api'; 
 
 document.addEventListener('DOMContentLoaded', () => {
     carregarPacotes();
