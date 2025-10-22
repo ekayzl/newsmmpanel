@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Loja SMM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <header class="bg-blue-600 p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-white">Painel Admin - Loja SMM</h1>
+            <nav>
+                <a href="index.html" class="text-white hover:text-blue-200 transition duration-150">Voltar para a Loja</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-6">
+        
+        <div class="border-b border-gray-200 mb-6">
+            <nav class="flex space-x-4" role="tablist">
+                <button id="tab-pedidos" data-tab="pedidos" 
+                        class="tab-button py-2 px-4 border-b-2 font-medium text-sm transition duration-150"
+                        onclick="showTab('pedidos')">
+                    Lista de Pedidos
+                </button>
+                <button id="tab-config-smm" data-tab="config-smm" 
+                        class="tab-button py-2 px-4 border-b-2 font-medium text-sm transition duration-150"
+                        onclick="showTab('config-smm')">
+                    Configuração SMM
+                </button>
+                <button id="tab-config-pagamento" data-tab="config-pagamento" 
+                        class="tab-button py-2 px-4 border-b-2 font-medium text-sm transition duration-150"
+                        onclick="showTab('config-pagamento')">
+                    Configurações de Pagamento
+                </button>
+            </nav>
+        </div>
+
+        <div id="content-pedidos" class="tab-content">
+            <h2 class="text-xl font-semibold text-gray-800 mb-6">Lista de Pedidos</h2>
+            <div id="pedidos-container" class="space-y-4">
+                <p class="text-center text-gray-500">Carregando pedidos...</p>
+            </div>
+        </div>
+
+        <div id="content-config-smm" class="tab-content hidden max-w-xl mx-auto bg-white shadow-xl rounded-xl p-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-3">
+                ⚙️ Credenciais do Fornecedor SMM
+            </h2>
+
+            <form id="config-smm-form" class="space-y-6">
+                <div>
+                    <label for="smmApiUrl" class="block text-sm font-medium text-gray-700 mb-1">
+                        URL da API do Fornecedor (Endpoint Base)
+                    </label>
+                    <input type="url" id="smmApiUrl" name="smmApiUrl" required
+                           class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                           placeholder="Ex: https://api.smmpanel.com/v1">
+                </div>
+
+                <div>
+                    <label for="smmApiKey" class="block text-sm font-medium text-gray-700 mb-1">
+                        Chave de Acesso (API Key)
+                    </label>
+                    <input type="text" id="smmApiKey" name="smmApiKey"
+                           class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono transition duration-150"
+                           placeholder="Sua chave de acesso secreta (deixe vazio para manter a atual)">
+                </div>
+
+                <button type="submit" id="save-smm-button"
+                        class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-lg font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300">
+                    Salvar Configuração SMM
+                </button>
+            </form>
+
+            <div id="smm-message" class="mt-6 p-4 rounded-lg text-sm font-medium hidden" role="alert"></div>
+        </div>
+
+        <div id="content-config-pagamento" class="tab-content hidden max-w-2xl mx-auto bg-white shadow-xl rounded-xl p-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-3">
+                💳 Configurações de Gateway de Pagamento
+            </h2>
+
+            <form id="config-pagamento-form" class="space-y-8">
+                
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        Gateway de Pagamento Ativo
+                    </label>
+                    <div class="flex items-center space-x-6 bg-gray-50 p-4 rounded-lg border">
+                        <label class="flex items-center space-x-2">
+                            <input type="radio" name="gatewayAtivo" id="gateway-pp" value="PushinPay" required
+                                   class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500">
+                            <span class="text-gray-900 font-medium">PushinPay</span>
+                        </label>
+                        <label class="flex items-center space-x-2">
+                            <input type="radio" name="gatewayAtivo" id="gateway-mp" value="MercadoPago" required
+                                   class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500">
+                            <span class="text-gray-900 font-medium">Mercado Pago</span>
+                        </label>
+                    </div>
+                </div>
+
+                <fieldset class="border p-4 rounded-lg space-y-4">
+                    <legend class="text-lg font-semibold px-2 text-gray-800">PushinPay</legend>
+                    <div>
+                        <label for="ppUrl" class="block text-sm font-medium text-gray-700 mb-1">API URL (Checkout)</label>
+                        <input type="url" id="ppUrl" name="ppUrl" 
+                               class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                               placeholder="Ex: https://api.pushinpay.com/v1">
+                    </div>
+                    <div>
+                        <label for="ppKey" class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                        <input type="text" id="ppKey" name="ppKey" 
+                               class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
+                               placeholder="Deixe vazio para manter a chave atual">
+                    </div>
+                </fieldset>
+
+                <fieldset class="border p-4 rounded-lg space-y-4">
+                    <legend class="text-lg font-semibold px-2 text-gray-800">Mercado Pago</legend>
+                    <div>
+                        <label for="mpToken" class="block text-sm font-medium text-gray-700 mb-1">Access Token</label>
+                        <input type="text" id="mpToken" name="mpToken" 
+                               class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
+                               placeholder="Seu token de produção (ex: APP_USR-...)">
+                    </div>
+                </fieldset>
+
+
+                <button type="submit" id="save-pagamento-button"
+                        class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-lg font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300">
+                    Salvar Configurações de Pagamento
+                </button>
+            </form>
+
+            <div id="pagamento-message" class="mt-6 p-4 rounded-lg text-sm font-medium hidden" role="alert"></div>
+        </div>
+
+    </main>
+    
+    <script src="admin.js"></script>
+</body>
+</html>

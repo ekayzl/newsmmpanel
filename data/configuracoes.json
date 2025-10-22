@@ -1,0 +1,34 @@
+{
+  "modo": "real",
+  "gateway_ativo": "MercadoPago",
+  "pushinpay": {
+    "api_url": "https://api.pushinpay.com.br/api/pix/cashIn",
+    "api_key": "31153|wnS0geT96c0NcMJHQe4gHcXutRBcXiFqmYzFUFv634c837c5"
+  },
+  "mercadopago": {
+    "access_token": "APP_USR-8235829930518749-072014-003c2cf0c3b31f4b321b94ff0cc3028a-1857587568"
+  },
+  "pagamento": {
+    "metodo_padrao": "pix",
+    "valor_padrao_pacote": 1,
+    "pushinpay": {
+      "modo_simulacao": {
+        "token": "TOKEN_DE_TESTE_OU_SIMULACAO_PUSHINPAY",
+        "url_api": "http://localhost:3000/api/pix/cashin-mock",
+        "webhook_url": "http://localhost:3000/api/webhook"
+      },
+      "modo_real": {
+        "token": "31153|wnS0geT96c0NcMJHQe4gHcXutRBcXiFqmYzFUFv634c837c5",
+        "url_api": "https://api.pushinpay.com.br/api/pix/cashIn",
+        "webhook_url": "https://talitha-paramagnetic-semiwildly.ngrok-free.dev/api/webhook"
+      }
+    }
+  },
+  "fornecedor_smm": {
+    "api_url": "https://measmm.com/api/v2",
+    "api_key": "5ebd206a27abc797e0408d578297fc25",
+    "servico_padrao": 2225,
+    "quantidade_padrao": 500
+  },
+  "pedidos": []
+}

@@ -1,0 +1,43 @@
+
+{
+  "categorias": [
+    {
+      "id": "insta_seguidores",
+      "nome": "Instagram Seguidores",
+      "descricao": "Seguidores reais e brasileiros para o seu perfil.",
+      "pacotes": [
+        {
+          "id": 100,
+          "nome": "100 Seguidores",
+          "preco": 4.99,
+          "min": 100,
+          "max": 50000,
+          "servico_api_id": "100"
+        },
+        {
+          "id": 500,
+          "nome": "500 Seguidores",
+          "preco": 19.90,
+          "min": 500,
+          "max": 50000,
+          "servico_api_id": "101"
+        }
+      ]
+    },
+    {
+      "id": "tiktok_likes",
+      "nome": "TikTok Curtidas",
+      "descricao": "Aumente a popularidade dos seus vídeos no TikTok.",
+      "pacotes": [
+        {
+          "id": 1000,
+          "nome": "1000 Curtidas",
+          "preco": 9.99,
+          "min": 100,
+          "max": 100000,
+          "servico_api_id": "200"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Pedido Concluído - Gemini Loja</title>
+    <link rel="stylesheet" href="style.css"> <style>
+        /* Estilos básicos para a mensagem de sucesso */
+        .success-message {
+            text-align: center;
+            padding: 40px;
+            border: 1px solid #c3e6cb;
+            background-color: #d4edda;
+            color: #155724;
+            border-radius: 8px;
+            margin-top: 50px;
+        }
+        .success-message h2 {
+            color: #28a745;
+            margin-bottom: 15px;
+        }
+        .success-message .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-message">
+            <span class="icon">✅</span>
+            <h2>Pedido Concluído com Sucesso!</h2>
+            <p>Seu pagamento foi confirmado e seu serviço foi enviado ao fornecedor.</p>
+            <p>Você pode fechar esta página.</p>
+            <p>O ID do seu pedido é: <strong id="pedido-id-sucesso"></strong></p>
+            <a href="index.html" class="button-back" style="margin-top: 20px;">Fazer Outro Pedido</a>
+        </div>
+    </div>
+    
+    <script>
+        // Pega o ID da URL para mostrar ao cliente (opcional)
+        const urlParams = new URLSearchParams(window.location.search);
+        const pedidoId = urlParams.get('pedidoId');
+        if (pedidoId) {
+            document.getElementById('pedido-id-sucesso').textContent = pedidoId;
+        }
+    </script>
+</body>
+</html>

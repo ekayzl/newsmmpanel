@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loja de Seguidores - FASE 1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css"> </head>
+<body class="bg-gray-100 font-sans">
+
+    <header class="bg-blue-600 p-4 shadow-md">
+        <div class="container mx-auto">
+            <h1 class="text-white text-3xl font-bold">Mega Engajamento Pro</h1>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 mt-8">
+        <h2 class="text-2xl font-semibold mb-6 text-gray-800">Escolha seu Pacote</h2>
+        
+        <div id="pacotes-container" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <p class="text-gray-500 col-span-full">Carregando pacotes...</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg mt-10 max-w-lg mx-auto">
+            <h3 class="text-xl font-bold mb-4">Teste de Pedido (Comunicação Backend)</h3>
+            <form id="form-pedido" class="space-y-4">
+                <p>⚠️ **O Pacote 500 Seguidores (ID 500) será usado para o teste de comunicação.**</p>
+                <div>
+                    <label for="link" class="block text-sm font-medium text-gray-700">Link do Perfil/Postagem:</label>
+                    <input type="url" id="link" name="link" required placeholder="https://instagram.com/seuusuario"
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="pacote-id" class="block text-sm font-medium text-gray-700">ID do Pacote (Teste):</label>
+                    <input type="number" id="pacote-id" name="pacoteId" value="500" readonly
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-500 text-white cursor-not-allowed">
+                </div>
+                <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    Enviar Pedido de Teste
+                </button>
+            </form>
+            <div id="status-pedido" class="mt-4 p-3 rounded-md text-sm"></div>
+        </div>
+    </main>
+
+    <script src="script.js"></script>
+    <div id="modal-pix" class="fixed inset-0 bg-gray-600 bg-opacity-75 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md relative">
+        
+        <button onclick="document.getElementById('modal-pix').classList.add('hidden')" 
+                class="absolute top-3 right-3 text-gray-400 hover:text-gray-800 transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+
+        <div id="modal-pix-content">
+            </div>
+
+    </div>
+</div>
+</body>
+</html>
