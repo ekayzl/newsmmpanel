@@ -1,20 +1,55 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="theme-default">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Loja SMM</title>
+    <title>Dashboard Admin - SMM PRO</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        /* Base e Tema Escuro (Dark Mode) */
+        :root {
+            --bg-body: #f3f4f6;
+            --bg-card: #ffffff;
+            --text-primary: #1f2937;
+            --text-secondary: #4b5563;
+        }
+        .dark {
+            --bg-body: #111827;
+            --bg-card: #1f2937;
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+        }
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .card {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        .tab-button.active {
+            border-color: #3b82f6; /* Tailwind blue-500 */
+            color: #3b82f6;
+        }
+        .dark .card {
+            box-shadow: 0 4px 6px -1px rgba(255, 255, 255, 0.05), 0 2px 4px -2px rgba(255, 255, 255, 0.05);
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <header class="bg-blue-600 p-4 shadow-md">
+<body class="min-h-screen">
+    <header class="bg-blue-600 p-4 shadow-xl">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-white">Painel Admin - Loja SMM</h1>
-            <nav>
-                <a href="index.html" class="text-white hover:text-blue-200 transition duration-150">Voltar para a Loja</a>
+            <h1 class="text-2xl font-extrabold text-white">Dashboard SMM PRO</h1>
+            <nav class="flex items-center space-x-4">
+                <button id="theme-toggle" class="p-2 rounded-full text-white hover:bg-blue-700 transition duration-150">
+                    <i id="theme-icon" class="fas fa-sun"></i> </button>
+                <a href="index.html" class="text-white hover:text-blue-200 transition duration-150">
+                    <i class="fas fa-store"></i> Loja
+                </a>
             </nav>
         </div>
     </header>
@@ -22,128 +57,199 @@
     <main class="container mx-auto p-6">
         
         <div class="border-b border-gray-200 mb-6">
-            <nav class="flex space-x-4" role="tablist">
+            <nav class="flex space-x-6" role="tablist">
+                <button id="tab-dashboard" data-tab="dashboard" 
+                        class="tab-button py-2 px-4 border-b-2 font-medium text-lg transition duration-150 text-gray-500 hover:text-blue-500 active">
+                    <i class="fas fa-chart-line mr-2"></i> Dashboard
+                </button>
                 <button id="tab-pedidos" data-tab="pedidos" 
-                        class="tab-button py-2 px-4 border-b-2 font-medium text-sm transition duration-150"
-                        onclick="showTab('pedidos')">
-                    Lista de Pedidos
+                        class="tab-button py-2 px-4 border-b-2 font-medium text-lg transition duration-150 text-gray-500 hover:text-blue-500">
+                    <i class="fas fa-receipt mr-2"></i> Pedidos
                 </button>
-                <button id="tab-config-smm" data-tab="config-smm" 
-                        class="tab-button py-2 px-4 border-b-2 font-medium text-sm transition duration-150"
-                        onclick="showTab('config-smm')">
-                    Configuração SMM
+                <button id="tab-smmservices" data-tab="smmservices" 
+                        class="tab-button py-2 px-4 border-b-2 font-medium text-lg transition duration-150 text-gray-500 hover:text-blue-500">
+                    <i class="fas fa-cog mr-2"></i> Gestão SMM
                 </button>
-                <button id="tab-config-pagamento" data-tab="config-pagamento" 
-                        class="tab-button py-2 px-4 border-b-2 font-medium text-sm transition duration-150"
-                        onclick="showTab('config-pagamento')">
-                    Configurações de Pagamento
+                <button id="tab-config" data-tab="config" 
+                        class="tab-button py-2 px-4 border-b-2 font-medium text-lg transition duration-150 text-gray-500 hover:text-blue-500">
+                    <i class="fas fa-wrench mr-2"></i> Configurações
                 </button>
             </nav>
         </div>
 
-        <div id="content-pedidos" class="tab-content">
-            <h2 class="text-xl font-semibold text-gray-800 mb-6">Lista de Pedidos</h2>
-            <div id="pedidos-container" class="space-y-4">
-                <p class="text-center text-gray-500">Carregando pedidos...</p>
+        <div id="content-dashboard" class="tab-content">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800 dark:text-gray-100">Visão Geral</h2>
+            
+            <div id="metric-cards" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="card p-6 rounded-xl border-l-4 border-blue-500">
+                    <p class="text-sm font-semibold text-blue-500 uppercase">Pedidos Totais</p>
+                    <p id="total-pedidos" class="text-3xl font-extrabold mt-1">0</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Desde o início</p>
+                </div>
+                <div class="card p-6 rounded-xl border-l-4 border-green-500">
+                    <p class="text-sm font-semibold text-green-500 uppercase">Faturamento (R$)</p>
+                    <p id="total-faturamento" class="text-3xl font-extrabold mt-1">R$ 0,00</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Total de vendas</p>
+                </div>
+                <div class="card p-6 rounded-xl border-l-4 border-yellow-500">
+                    <p class="text-sm font-semibold text-yellow-500 uppercase">Lucro Estimado (R$)</p>
+                    <p id="total-lucro" class="text-3xl font-extrabold mt-1">R$ 0,00</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Lucro após custos SMM</p>
+                </div>
+                <div class="card p-6 rounded-xl border-l-4 border-purple-500">
+                    <p class="text-sm font-semibold text-purple-500 uppercase">Status do Servidor</p>
+                    <p id="server-status" class="text-2xl font-extrabold mt-1 text-green-600 dark:text-green-400">Online</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Verificação: <span id="server-last-check">0s atrás</span></p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="card p-6 rounded-xl lg:col-span-2">
+                    <h3 class="text-xl font-bold mb-4">Pedidos por Status (Últimos 7 Dias)</h3>
+                    <div id="chart-pedidos" class="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-chart-bar mr-2"></i> Gráfico será implementado aqui (simulação por enquanto)
+                    </div>
+                </div>
+                <div class="card p-6 rounded-xl">
+                    <h3 class="text-xl font-bold mb-4">Avisos e Saldo</h3>
+                    <div id="saldo-container" class="mb-4">
+                        <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">Saldo Fornecedor:</p>
+                        <p id="smm-balance" class="text-2xl font-extrabold text-blue-500 mt-1">R$ --,--</p>
+                    </div>
+                    <button onclick="carregarSaldo()" class="w-full py-2 px-4 rounded-lg text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 transition duration-300">
+                        <i class="fas fa-sync-alt mr-2"></i> Checar Saldo
+                    </button>
+                    <div id="saldo-message" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Última checagem: --</div>
+                </div>
             </div>
         </div>
 
-        <div id="content-config-smm" class="tab-content hidden max-w-xl mx-auto bg-white shadow-xl rounded-xl p-8">
-            <h2 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-3">
-                ⚙️ Credenciais do Fornecedor SMM
-            </h2>
 
-            <form id="config-smm-form" class="space-y-6">
-                <div>
-                    <label for="smmApiUrl" class="block text-sm font-medium text-gray-700 mb-1">
-                        URL da API do Fornecedor (Endpoint Base)
-                    </label>
-                    <input type="url" id="smmApiUrl" name="smmApiUrl" required
-                           class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150"
-                           placeholder="Ex: https://api.smmpanel.com/v1">
-                </div>
-
-                <div>
-                    <label for="smmApiKey" class="block text-sm font-medium text-gray-700 mb-1">
-                        Chave de Acesso (API Key)
-                    </label>
-                    <input type="text" id="smmApiKey" name="smmApiKey"
-                           class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono transition duration-150"
-                           placeholder="Sua chave de acesso secreta (deixe vazio para manter a atual)">
-                </div>
-
-                <button type="submit" id="save-smm-button"
-                        class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-lg font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300">
-                    Salvar Configuração SMM
-                </button>
-            </form>
-
-            <div id="smm-message" class="mt-6 p-4 rounded-lg text-sm font-medium hidden" role="alert"></div>
+        <div id="content-pedidos" class="tab-content hidden">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800 dark:text-gray-100">Gerenciamento de Pedidos</h2>
+            
+            <div class="card p-6 rounded-xl overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ID Loja</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Pacote</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Link</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Valor</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status Pag.</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status SMM</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pedidos-container" class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                        <tr><td colspan="7" class="py-4 text-center text-gray-500">Carregando pedidos...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <div id="content-config-pagamento" class="tab-content hidden max-w-2xl mx-auto bg-white shadow-xl rounded-xl p-8">
-            <h2 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-3">
-                💳 Configurações de Gateway de Pagamento
-            </h2>
 
-            <form id="config-pagamento-form" class="space-y-8">
-                
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">
-                        Gateway de Pagamento Ativo
-                    </label>
-                    <div class="flex items-center space-x-6 bg-gray-50 p-4 rounded-lg border">
-                        <label class="flex items-center space-x-2">
-                            <input type="radio" name="gatewayAtivo" id="gateway-pp" value="PushinPay" required
-                                   class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500">
-                            <span class="text-gray-900 font-medium">PushinPay</span>
-                        </label>
-                        <label class="flex items-center space-x-2">
-                            <input type="radio" name="gatewayAtivo" id="gateway-mp" value="MercadoPago" required
-                                   class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500">
-                            <span class="text-gray-900 font-medium">Mercado Pago</span>
-                        </label>
-                    </div>
+        <div id="content-smmservices" class="tab-content hidden">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800 dark:text-gray-100">Gestão de Serviços SMM</h2>
+
+            <div class="card p-6 rounded-xl">
+                <div class="flex justify-between items-center mb-6 border-b pb-4 dark:border-gray-700">
+                    <h3 class="text-xl font-bold">Serviços do Fornecedor</h3>
+                    <button onclick="carregarServicosFornecedor()" 
+                            class="py-2 px-4 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition duration-300">
+                        <i class="fas fa-cloud-download-alt mr-2"></i> Puxar Serviços da API
+                    </button>
                 </div>
 
-                <fieldset class="border p-4 rounded-lg space-y-4">
-                    <legend class="text-lg font-semibold px-2 text-gray-800">PushinPay</legend>
-                    <div>
-                        <label for="ppUrl" class="block text-sm font-medium text-gray-700 mb-1">API URL (Checkout)</label>
-                        <input type="url" id="ppUrl" name="ppUrl" 
-                               class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="Ex: https://api.pushinpay.com/v1">
+                <div id="smm-services-message" class="p-4 rounded-lg text-sm mb-4 hidden"></div>
+
+                <div id="smm-services-container">
+                    <p class="text-gray-500">Clique em "Puxar Serviços da API" para carregar os pacotes disponíveis no fornecedor.</p>
+                    
                     </div>
-                    <div>
-                        <label for="ppKey" class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-                        <input type="text" id="ppKey" name="ppKey" 
-                               class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
-                               placeholder="Deixe vazio para manter a chave atual">
-                    </div>
-                </fieldset>
-
-                <fieldset class="border p-4 rounded-lg space-y-4">
-                    <legend class="text-lg font-semibold px-2 text-gray-800">Mercado Pago</legend>
-                    <div>
-                        <label for="mpToken" class="block text-sm font-medium text-gray-700 mb-1">Access Token</label>
-                        <input type="text" id="mpToken" name="mpToken" 
-                               class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
-                               placeholder="Seu token de produção (ex: APP_USR-...)">
-                    </div>
-                </fieldset>
+            </div>
+        </div>
 
 
-                <button type="submit" id="save-pagamento-button"
-                        class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-lg font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300">
-                    Salvar Configurações de Pagamento
-                </button>
-            </form>
+        <div id="content-config" class="tab-content hidden">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800 dark:text-gray-100">Configurações Gerais</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-            <div id="pagamento-message" class="mt-6 p-4 rounded-lg text-sm font-medium hidden" role="alert"></div>
+                <div class="card p-6 rounded-xl">
+                    <h3 class="text-xl font-bold mb-4 border-b pb-3 dark:border-gray-700">Fornecedor SMM</h3>
+                    <form id="config-smm-form" class="space-y-4">
+                        <div>
+                            <label for="smmApiUrl" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL da API SMM</label>
+                            <input type="url" id="smmApiUrl" name="smmApiUrl" required 
+                                   class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                   placeholder="https://sua-plataforma-smm.com/api/v2">
+                        </div>
+                        <div>
+                            <label for="smmApiKey" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Chave API SMM</label>
+                            <input type="text" id="smmApiKey" name="smmApiKey" required 
+                                   class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                   placeholder="Sua chave secreta para pedidos">
+                        </div>
+                        
+                        <button type="submit" id="save-smm-button"
+                                class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-lg font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300">
+                            Salvar Configurações SMM
+                        </button>
+                    </form>
+                    <div id="smm-message" class="mt-4 p-3 rounded-lg text-sm font-medium hidden"></div>
+                </div>
+
+
+                <div class="card p-6 rounded-xl">
+                    <h3 class="text-xl font-bold mb-4 border-b pb-3 dark:border-gray-700">Gateways de Pagamento</h3>
+                    <form id="config-pagamento-form" class="space-y-4">
+                        
+                        <div>
+                            <label for="gatewayAtivo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Gateway Ativo</label>
+                            <select id="gatewayAtivo" name="gatewayAtivo" 
+                                    class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                <option value="PushinPay">PushinPay (Recomendado - Pix)</option>
+                                <option value="MercadoPago">Mercado Pago (Pix)</option>
+                            </select>
+                        </div>
+
+                        <fieldset class="border p-4 rounded-lg space-y-4 dark:border-gray-700">
+                            <legend class="text-lg font-semibold px-2 text-gray-800 dark:text-gray-100">PushinPay (Ativo)</legend>
+                            <div>
+                                <label for="ppKey" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Key</label>
+                                <input type="text" id="ppKey" name="ppKey" 
+                                       class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                       placeholder="Deixe vazio para manter a chave atual">
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="border p-4 rounded-lg space-y-4 dark:border-gray-700">
+                            <legend class="text-lg font-semibold px-2 text-gray-800 dark:text-gray-100">Mercado Pago</legend>
+                            <div>
+                                <label for="mpToken" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Access Token</label>
+                                <input type="text" id="mpToken" name="mpToken" 
+                                       class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                       placeholder="Seu token de produção (ex: APP_USR-...)">
+                            </div>
+                        </fieldset>
+
+
+                        <button type="submit" id="save-pagamento-button"
+                                class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-lg font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300">
+                            Salvar Configurações de Pagamento
+                        </button>
+                    </form>
+
+                    <div id="pagamento-message" class="mt-6 p-4 rounded-lg text-sm font-medium hidden"></div>
+                </div>
+                
+            </div>
         </div>
 
     </main>
-    
     <script src="admin.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+
 </body>
 </html>
