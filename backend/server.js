@@ -969,6 +969,234 @@ app.post('/api/admin/config-pagamento', async (req, res) => {
     }
 });
 
+/**
+ * @description Carrega a lista de pedidos de forma segura.
+ */
+async function loadPedidos() {
+    try {
+        const pedidosData = await fs.readFile(PEDIDOS_PATH, 'utf-8');
+        // Garante que o arquivo não esteja vazio
+        if (pedidosData && pedidosData.trim().length > 0) {
+            return JSON.parse(pedidosData);
+        }
+    } catch (error) {
+        // Se o arquivo não existir (ENOENT), retorna array vazio
+        if (error.code === 'ENOENT') {
+            return [];
+        }
+        console.error('Erro ao carregar pedidos.json:', error);
+        throw error;
+    }
+    // Este return trata o caso em que o arquivo existe, mas está vazio (não JSON válido).
+    return []; 
+}
+
+// ------------------------------------------------------------------------
+// ROTAS PRINCIPAIS DA LOJA (PARA O CLIENTE)
+// ------------------------------------------------------------------------
+
+/**
+ * @description Rota para o frontend carregar a lista de pacotes.
+ */
+app.get('/api/pacotes', async (req, res) => {
+    try {
+        const pacotesData = await fs.readFile(PACOTES_PATH, 'utf-8');
+        res.json(JSON.parse(pacotesData));
+    } catch (error) {
+        console.error('Erro ao carregar pacotes.json:', error);
+        res.status(500).json({ error: 'Falha ao carregar pacotes.' });
+    }
+});
+
+
+/**
+ * @description Rota para o cliente criar um pedido.
+ * Salva no JSON e inicia o pagamento.
+ */
+app.post('/api/pedido', async (req, res) => {
+    const { pacoteId, link } = req.body;
+    
+    // 1. Validação básica (deveria ser mais completa)
+    if (!pacoteId || !link) {
+        return res.status(400).json({ erro: 'Dados de pedido inválidos.' });
+    }
+
+    try {
+        const config = await loadConfig();
+        const pacotesData = await fs.readFile(PACOTES_PATH, 'utf-8');
+        const pacotes = JSON.parse(pacotesData);
+
+        // Busca o pacote pelo ID
+        let pacoteEncontrado = null;
+        pacotes.categorias.forEach(cat => {
+            const p = cat.pacotes.find(p => p.id === pacoteId);
+            if (p) {
+                pacoteEncontrado = p;
+            }
+        });
+
+        if (!pacoteEncontrado) {
+            return res.status(404).json({ erro: 'Pacote não encontrado.' });
+        }
+        
+        // Determina ID do pedido
+        const pedidos = await loadPedidos();
+        const novoPedidoId = pedidos.length > 0 ? pedidos[pedidos.length - 1].id + 1 : 1000;
+
+        // Cria o objeto do novo pedido
+        const novoPedido = {
+            id: novoPedidoId,
+            data: new Date().toISOString(),
+            link: link,
+            pacoteId: pacoteId,
+            pacoteNome: pacoteEncontrado.nome,
+            quantidade: pacoteEncontrado.min, // Usando min como quantidade padrão
+            valor: pacoteEncontrado.preco.toFixed(2),
+            email: 'cliente@teste.com', // Mock - deve vir do formulário
+            status: 'Aguardando Pagamento',
+            pagamento: {
+                gateway: config.gateway_ativo,
+                status: 'Pendente',
+            },
+            api: {}
+        };
+        
+        // 2. Salva o pedido no JSON
+        pedidos.push(novoPedido);
+        await fs.writeFile(PEDIDOS_PATH, JSON.stringify(pedidos, null, 2));
+
+        // 3. Inicia o Pagamento
+        let pagamentoResponse;
+        
+        if (config.gateway_ativo === 'MercadoPago') {
+            const externalRef = `SMM-${novoPedidoId}`;
+            const description = `${novoPedido.pacoteNome} (${novoPedido.quantidade})`;
+            
+            // Usa a função do módulo mercadopago.js
+            pagamentoResponse = await criarPagamentoPixMP(
+                novoPedido.valor, 
+                description, 
+                novoPedido.email, 
+                externalRef
+            );
+            
+        } else if (config.gateway_ativo === 'PushinPay') {
+            // Lógica de Pagamento PushinPay (A ser implementada ou simulada)
+            pagamentoResponse = {
+                id: `PUSHIN-${novoPedidoId}`,
+                status: 'pending',
+                qrCodeBase64: 'mock_base64_pushinpay_qr_code',
+                pixCode: 'mock_pix_copia_e_cola_pushinpay',
+                externalReference: `SMM-${novoPedidoId}`
+            };
+        } else {
+             // Modo Simulação/Outro
+             pagamentoResponse = { 
+                 id: `MOCK-${novoPedidoId}`, 
+                 status: 'pending', 
+                 qrCodeBase64: 'mock_base64_qr_code', 
+                 pixCode: 'mock_pix_copia_e_cola', 
+                 externalReference: `SMM-${novoPedidoId}` 
+            };
+        }
+        
+        // Atualiza o pedido com os dados de pagamento (ID do PIX, status, etc.)
+        novoPedido.pagamento.id = pagamentoResponse.id;
+        novoPedido.pagamento.status = pagamentoResponse.status === 'approved' ? 'Confirmado' : 'Aguardando PIX';
+        await fs.writeFile(PEDIDOS_PATH, JSON.stringify(pedidos, null, 2));
+        
+        // 4. Retorna os dados do Pix para o frontend
+        res.json({
+            pedidoId: novoPedidoId,
+            qrCodeBase64: pagamentoResponse.qrCodeBase64,
+            pixCode: pagamentoResponse.pixCode,
+            valor: novoPedido.valor,
+            mensagem: 'Pedido criado com sucesso! Prossiga para o pagamento Pix.'
+        });
+
+    } catch (error) {
+        console.error('🔴 Erro fatal ao processar pedido:', error);
+        res.status(500).json({ erro: `Falha interna no servidor: ${error.message}` });
+    }
+});
+
+
+/**
+ * @description Rota para o Webhook do Mercado Pago
+ * Recebe a notificação de pagamento confirmado.
+ * ⚠️ ATENÇÃO: Esta rota precisa ser exposta publicamente (ex: via ngrok) para funcionar.
+ */
+app.post('/api/webhook-mp', async (req, res) => {
+    console.log('\n======================================================');
+    console.log('🔔 WEBHOOK MP RECEBIDO');
+    console.log('======================================================');
+    
+    // O Mercado Pago envia notificações de diferentes tipos.
+    // Você deve implementar a lógica para verificar a autenticidade (secret) e o tipo.
+    
+    // ⚠️ IMPLEMENTAÇÃO BÁSICA PARA PIX (ASSUME QUE A NOTIFICAÇÃO É VÁLIDA)
+    
+    // Tenta encontrar o external_reference ou o ID de pagamento na requisição.
+    // Depende da configuração do seu IPN/Webhook no MP.
+    let externalReference = req.body.data?.id || req.body.external_reference; // Exemplo simplificado
+    
+    if (!externalReference) {
+        console.warn('Webhook: external_reference não encontrado no payload.');
+        return res.status(200).send('OK (Sem external_reference)');
+    }
+
+    try {
+        const pedidos = await loadPedidos();
+        const pedidoId = parseInt(externalReference.replace('SMM-', '')); 
+        const pedidoIndex = pedidos.findIndex(p => p.id === pedidoId);
+
+        if (pedidoIndex === -1) {
+            console.warn(`Webhook: Pedido ${pedidoId} não encontrado.`);
+            return res.status(200).send('OK (Pedido não encontrado)');
+        }
+        
+        // Verifica se o pagamento já está confirmado para evitar reenvio
+        if (pedidos[pedidoIndex].pagamento.status === 'Confirmado' && pedidos[pedidoIndex].status === 'Aguardando Envio') {
+            console.log(`Webhook: Pedido ${pedidoId} já estava confirmado. Ignorando.`);
+            return res.status(200).send('OK (Já confirmado)');
+        }
+
+        // Simulação de verificação de status (Na vida real, você chamaria a API do MP para confirmar)
+        const statusMP = req.body.type === 'payment' && req.body.action === 'payment.created' ? 'approved' : 'approved'; // Assumindo 'approved' para simplificar o teste.
+
+        if (statusMP === 'approved') {
+            
+            // 1. Atualiza Status de Pagamento
+            pedidos[pedidoIndex].pagamento.status = 'Confirmado';
+            pedidos[pedidoIndex].status = 'Aguardando Envio'; // Altera status para o SMM
+            
+            // 2. Envia para o Painel SMM
+            // Supondo que você tem o serviço SMM disponível
+            const smmResponse = await SMM.sendOrderSMM(pedidos[pedidoIndex]);
+            
+            // 3. Atualiza com o ID e Status da API SMM
+            pedidos[pedidoIndex].api = {
+                api_id: smmResponse.api_id,
+                api_status: smmResponse.api_status || 'Processing',
+                data_envio: new Date().toISOString()
+            };
+            pedidos[pedidoIndex].status = 'Em Processamento SMM';
+
+            // 4. Salva no JSON
+            await fs.writeFile(PEDIDOS_PATH, JSON.stringify(pedidos, null, 2));
+
+            console.log(`✅ Pedido ${pedidoId} CONFIRMADO e ENVIADO para SMM. API ID: ${smmResponse.api_id}`);
+        }
+        
+        res.status(200).send('OK');
+
+    } catch (error) {
+        console.error('🔴 Erro no Webhook MP:', error);
+        res.status(500).send('Erro interno do servidor.');
+    }
+});
+
+
 // -------------------------------------------------------------------------
 // Endpoint de Consulta Simples de Status
 // -------------------------------------------------------------------------
